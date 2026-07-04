@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wanmon – WAN Monitor & Failover Controller</title>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: #1e1e2e; color: #cdd6f4; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; }
+        h1 { color: #89b4fa; font-size: 1.8rem; margin: 0 0 8px; }
+        .subtitle { color: #6c7086; margin-bottom: 20px; font-size: 0.9rem; }
+        .card { background: #313244; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card-title { font-weight: 600; color: #a6adc8; margin-bottom: 8px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .badge-green { background: #49b881; color: #1e1e2e; }
+        .badge-red { background: #f38ba8; color: #1e1e2e; }
+        .badge-gray { background: #6c7086; color: #1e1e2e; }
+        .mono { font-family: 'JetBrains Mono', 'Cascadia Code', monospace; font-size: 0.9rem; background: #1e1e2e; padding: 8px 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin: 4px 0; }
+        .btn { background: #45475a; border: none; color: #cdd6f4; padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: background 0.2s; }
+        .btn:hover { background: #585b70; }
+        .btn-primary { background: #89b4fa; color: #1e1e2e; }
+        .btn-primary:hover { background: #74c7ec; }
+        .btn-danger { background: #f38ba8; color: #1e1e2e; }
+        .btn-danger:hover { background: #eba0ac; }
+        .btn-success { background: #49b881; color: #1e1e2e; }
+        .btn-success:hover { background: #5ce0a0; }
+        .flex { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .mt-2 { margin-top: 8px; }
+        .error-text { color: #f38ba8; }
+        .loading-text { color: #6c7086; font-style: italic; }
+        select {
+            background: #1e1e2e;
+            border: 1px solid #45475a;
+            color: #cdd6f4;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            min-width: 200px;
+            cursor: pointer;
+        }
+        select:focus { outline: none; border-color: #89b4fa; }
+        select option { background: #1e1e2e; color: #cdd6f4; }
+        .log-container { max-height: 200px; overflow-y: auto; }
+        .log-line { font-family: monospace; font-size: 0.8rem; color: #a6adc8; border-bottom: 1px solid #2a2a3a; padding: 2px 0; }
+        .log-line:nth-child(odd) { background: #28283a; }
+        pre { margin: 0; }
+        .pretty-line { padding: 2px 0; border-bottom: 1px solid #2a2a3a; }
+        .pretty-line:last-child { border-bottom: none; }
+        .key { color: #89b4fa; font-weight: 500; }
+        .value { color: #a6adc8; }
+        .value-good { color: #49b881; }
+        .value-bad { color: #f38ba8; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📡 wanmon</h1>
+    <div class="subtitle">WAN Monitor & Failover Controller</div>
+
+    <!-- Status -->
+    <div class="card">
+        <div class="card-title">Daemon</div>
+        <div class="status-row">
+            <span id="daemon-status" class="badge badge-gray">● Loading...</span>
+            <span id="daemon-pid" class="mono" style="background:transparent;padding:0;">PID: —</span>
+            <div class="flex">
+                <button class="btn btn-success" onclick="sendAction('start')">▶ Start</button>
+                <button class="btn btn-danger" onclick="sendAction('stop')">■ Stop</button>
+                <button class="btn btn-primary" onclick="sendAction('restart')">⟳ Restart</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Default Route -->
+    <div class="card">
+        <div class="card-title">Default Route</div>
+        <div id="default-route" class="mono">Loading...</div>
+    </div>
+
+    <!-- Preferred -->
+    <div class="card">
+        <div class="card-title">Preferred</div>
+        <div id="preferred" class="mono">Loading...</div>
+    </div>
+
+    <!-- Manual Switch -->
+    <div class="card">
+        <div class="card-title">Manual Switch</div>
+        <div class="flex">
+            <select id="switch-iface">
+                <option value="">-- select --</option>
+            </select>
+            <button class="btn btn-primary" onclick="manualSwitch()">Apply</button>
+        </div>
+        <div id="switch-result" class="mono" style="margin-top:6px;font-size:0.8rem;"></div>
+    </div>
+
+    <!-- Interface Scores -->
+    <div class="card">
+        <div class="card-title">Interface Scores (decision.json)</div>
+        <div id="scores" class="mono">Loading...</div>
+    </div>
+
+    <!-- Telemetry -->
+    <div class="card">
+        <div class="card-title">Telemetry (state.json)</div>
+        <div id="telemetry" class="mono">Loading...</div>
+    </div>
+
+    <!-- Policy -->
+    <div class="card">
+        <div class="card-title">Policy (ifaces.json)</div>
+        <div id="policy" class="mono">Loading...</div>
+    </div>
+
+    <!-- Logs -->
+    <div class="card">
+        <div class="card-title">Logs (last 30 lines)</div>
+        <div id="logs" class="mono log-container">Loading...</div>
+    </div>
+</div>
+
+<script>
+    const CGI_URL = '/cgi-bin/wanmon.cgi';
+
+    function fetchJSON(action, params) {
+        let url = CGI_URL + '?action=' + action;
+        if (params) {
+            for (let key in params) {
+                url += '&' + key + '=' + encodeURIComponent(params[key]);
+            }
+        }
+        return fetch(url)
+            .then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .catch(err => ({ error: err.message }));
+    }
+
+    function sendAction(action, extra) {
+        let data = { action: action };
+        if (extra) Object.assign(data, extra);
+        fetch(CGI_URL + '?' + new URLSearchParams(data))
+            .then(res => res.json())
+            .then(json => {
+                if (json.success) {
+                    showToast('Action ' + action + ' success: ' + (json.message || ''));
+                } else {
+                    showToast('Action ' + action + ' failed: ' + (json.message || json.error || 'unknown error'), true);
+                }
+                refreshAll();
+            })
+            .catch(err => {
+                showToast('Error: ' + err.message, true);
+            });
+    }
+
+    function populateInterfaceSelect() {
+        fetchJSON('ifaces')
+            .then(json => {
+                const select = document.getElementById('switch-iface');
+                select.innerHTML = '<option value="">-- select --</option>';
+                if (json && typeof json === 'object' && !json.error) {
+                    const keys = Object.keys(json);
+                    if (keys.length === 0) {
+                        select.innerHTML = '<option value="">No interfaces</option>';
+                    } else {
+                        keys.forEach(key => {
+                            const opt = document.createElement('option');
+                            opt.value = key;
+                            opt.textContent = key + ' (bias: ' + json[key] + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                } else {
+                    select.innerHTML = '<option value="">Error loading interfaces</option>';
+                }
+            })
+            .catch(() => {
+                const select = document.getElementById('switch-iface');
+                select.innerHTML = '<option value="">Error loading interfaces</option>';
+            });
+    }
+
+    function manualSwitch() {
+        const iface = document.getElementById('switch-iface').value;
+        if (!iface) {
+            showToast('Please select an interface', true);
+            return;
+        }
+        const resultDiv = document.getElementById('switch-result');
+        resultDiv.textContent = 'Switching...';
+        fetchJSON('switch', { iface: iface })
+            .then(json => {
+                if (json.success) {
+                    resultDiv.textContent = '✓ ' + (json.message || 'Switched to ' + iface);
+                    resultDiv.style.color = '#49b881';
+                } else {
+                    resultDiv.textContent = '✗ ' + (json.message || json.error || 'Failed');
+                    resultDiv.style.color = '#f38ba8';
+                }
+                refreshAll();
+            })
+            .catch(err => {
+                resultDiv.textContent = '✗ ' + err.message;
+                resultDiv.style.color = '#f38ba8';
+            });
+    }
+
+    // ----- Pretty renderers -----
+    function renderDecision(json) {
+        if (!json || typeof json !== 'object' || json.error) {
+            return '<div class="error-text">No data</div>';
+        }
+        let html = '';
+        if (json.preferred) {
+            html += '<div class="pretty-line"><span class="key">Preferred:</span> <span class="value value-good">' + json.preferred + '</span></div>';
+        }
+        for (let key in json) {
+            if (key === 'preferred') continue;
+            if (typeof json[key] === 'number') {
+                html += '<div class="pretty-line"><span class="key">' + key + ' score:</span> <span class="value">' + json[key] + '</span></div>';
+            }
+        }
+        return html || '<div class="pretty-line">No score data</div>';
+    }
+
+    function renderState(json) {
+        if (!json || typeof json !== 'object' || json.error) {
+            return '<div class="error-text">No data</div>';
+        }
+        let html = '';
+        for (let iface in json) {
+            const d = json[iface];
+            if (typeof d === 'object' && d.latency !== undefined) {
+                const lossClass = d.loss > 50 ? 'value-bad' : 'value-good';
+                html += '<div class="pretty-line">' +
+                    '<span class="key">' + iface + ':</span> ' +
+                    'latency <span class="value">' + d.latency + ' ms</span>, ' +
+                    'loss <span class="value ' + lossClass + '">' + d.loss + '%</span>, ' +
+                    'jitter <span class="value">' + d.jitter + ' ms</span>' +
+                '</div>';
+            }
+        }
+        return html || '<div class="pretty-line">No telemetry data</div>';
+    }
+
+    function renderPolicy(json) {
+        if (!json || typeof json !== 'object' || json.error) {
+            return '<div class="error-text">No data</div>';
+        }
+        let html = '';
+        for (let iface in json) {
+            html += '<div class="pretty-line"><span class="key">' + iface + ':</span> <span class="value">bias ' + json[iface] + '</span></div>';
+        }
+        return html || '<div class="pretty-line">No policy data</div>';
+    }
+
+    function refreshAll() {
+        // Status
+        fetchJSON('status')
+            .then(json => {
+                const statusEl = document.getElementById('daemon-status');
+                const pidEl = document.getElementById('daemon-pid');
+                const routeEl = document.getElementById('default-route');
+                const prefEl = document.getElementById('preferred');
+                if (json.running) {
+                    statusEl.textContent = '● Running (PID ' + json.pid + ')';
+                    statusEl.className = 'badge badge-green';
+                } else {
+                    statusEl.textContent = '● Stopped';
+                    statusEl.className = 'badge badge-red';
+                }
+                pidEl.textContent = 'PID: ' + json.pid;
+                routeEl.textContent = json.default_route || 'No default route';
+                prefEl.textContent = json.preferred || 'none';
+            })
+            .catch(err => {
+                document.getElementById('daemon-status').textContent = '● Error loading';
+                document.getElementById('daemon-status').className = 'badge badge-red';
+            });
+
+        // Scores
+        fetchJSON('decision')
+            .then(json => {
+                document.getElementById('scores').innerHTML = renderDecision(json);
+            })
+            .catch(() => {
+                document.getElementById('scores').innerHTML = '<div class="error-text">Error loading</div>';
+            });
+
+        // Telemetry
+        fetchJSON('state')
+            .then(json => {
+                document.getElementById('telemetry').innerHTML = renderState(json);
+            })
+            .catch(() => {
+                document.getElementById('telemetry').innerHTML = '<div class="error-text">Error loading</div>';
+            });
+
+        // Policy
+        fetchJSON('ifaces')
+            .then(json => {
+                document.getElementById('policy').innerHTML = renderPolicy(json);
+            })
+            .catch(() => {
+                document.getElementById('policy').innerHTML = '<div class="error-text">Error loading</div>';
+            });
+
+        // Logs
+        fetchJSON('logs')
+            .then(json => {
+                const logDiv = document.getElementById('logs');
+                if (json.logs && json.logs.length > 0) {
+                    logDiv.innerHTML = json.logs.map(l => '<div class="log-line">' + l + '</div>').join('');
+                } else {
+                    logDiv.textContent = 'No logs yet';
+                }
+            })
+            .catch(() => {
+                document.getElementById('logs').textContent = 'Error loading logs';
+                document.getElementById('logs').className = 'error-text';
+            });
+    }
+
+    function showToast(msg, isError) {
+        const div = document.createElement('div');
+        div.textContent = msg;
+        div.style.cssText = `
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: ${isError ? '#f38ba8' : '#49b881'};
+            color: #1e1e2e; padding: 10px 20px; border-radius: 8px;
+            font-size: 0.9rem; font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 999; max-width: 90%;
+            transition: opacity 0.3s;
+        `;
+        document.body.appendChild(div);
+        setTimeout(() => { div.style.opacity = '0'; setTimeout(() => div.remove(), 300); }, 3000);
+    }
+
+    // Initial load and auto-refresh every 5s
+    refreshAll();
+    populateInterfaceSelect();
+    setInterval(refreshAll, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "luci-app-wanmon": {
+    "description": "Grant access to wanmon",
+    "read": {
+      "ubus": {
+        "luci-app-wanmon": [ "*" ]
+      },
+      "file": {
+        "/tmp/wanmon/*": [ "read" ],
+        "/etc/wanmon/*": [ "read" ]
+      }
+    },
+    "write": {
+      "file": {
+        "/tmp/wanmon/*": [ "write" ],
+        "/etc/wanmon/*": [ "write" ]
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "interval": 60,
+  "ping_host": "1.1.1.1",
+  "ping_timeout": 2,
+  "ping_samples": 5,
+  "smooth_window": 5,
+  "hysteresis_threshold": 20,
+  "loss_divisor": 10,
+  "hard_loss_limit": 80,
+  "dead_score": 99999,
+  "default_metric": 100
+}

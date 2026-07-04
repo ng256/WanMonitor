@@ -1,0 +1,12 @@
+{
+  "admin/services/wanmon": {
+    "title": "WAN Monitor",
+    "action": {
+      "path": "wanmon/status",
+      "type": "view"
+    },
+    "depends": [
+      "luci-app-wanmon"
+    ]
+  }
+}
