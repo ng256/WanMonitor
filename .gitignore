@@ -1,4 +1,3 @@
-cat > .gitignore <<'EOF'
 # Temporary build output
 out/
 *.ipk
@@ -16,4 +15,3 @@ out/
 
 # Build tools (if you clone ipkg-build separately)
 tools/
-EOF
