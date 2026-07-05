@@ -1,47 +1,66 @@
 #!/bin/sh
+set -e
+
 # ============================================================================
-#   build-ipk.sh – build IPK package for wanmon
+#   wm-build_ipk.sh – build IPK package for wanmon (OpenWrt official way)
 #   (C) 2026 Pavel Bashkardin
 # ============================================================================
 
-set -e
-
-# Package metadata
 PKG_NAME="wanmon"
 PKG_VERSION="1.0"
 PKG_REVISION="1"
 PKG_ARCH="all"
-PKG_MAINTAINER="Pavel Bashkardin"
-PKG_DESCRIPTION="WAN Monitor & Failover Controller"
+PKG_DEPENDS="jq"
 
-# Dependencies (opkg package names)
-# jq is required; ip, awk, etc. are expected to be present in base system
-DEPENDS="jq"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+OUT="$ROOT/out"
+PKG_ROOT="$OUT/$PKG_NAME"
+IPKG_BUILD="$ROOT/tools/ipk-build.sh"
 
-# Temporary build directories
-BUILD_DIR="$(mktemp -d)"
-PKG_ROOT="$BUILD_DIR/ipkg-root"
-CONTROL="$PKG_ROOT/CONTROL"
-DATA="$PKG_ROOT"
+# ----------------------------------------------------------------------------
+# DEBUG: variables dump
+# ----------------------------------------------------------------------------
+echo "================= DEBUG ================="
+echo "PKG_NAME     = $PKG_NAME"
+echo "PKG_VERSION  = $PKG_VERSION"
+echo "PKG_REVISION = $PKG_REVISION"
+echo "PKG_ARCH     = $PKG_ARCH"
+echo "PKG_DEPENDS  = $PKG_DEPENDS"
+echo "ROOT         = $ROOT"
+echo "OUT          = $OUT"
+echo "PKG_ROOT     = $PKG_ROOT"
+echo "IPKG_BUILD   = $IPKG_BUILD"
+echo "========================================="
 
-cleanup() {
-    rm -rf "$BUILD_DIR"
+# ----------------------------------------------------------------------------
+# Prepare dirs
+# ----------------------------------------------------------------------------
+rm -rf "$OUT"
+mkdir -p "$PKG_ROOT"
+
+echo "Building in: $PKG_ROOT"
+
+# ----------------------------------------------------------------------------
+# Copy files
+# ----------------------------------------------------------------------------
+copy() {
+    src="$ROOT/$1"
+    dst="$PKG_ROOT/$1"
+
+    echo "COPY DEBUG:"
+    echo "  src = $src"
+    echo "  dst = $dst"
+
+    if [ -e "$src" ]; then
+        mkdir -p "$(dirname "$dst")"
+        cp -a "$src" "$dst"
+        echo "  Copied $1"
+    else
+        echo "  Missing $1"
+    fi
 }
-trap cleanup EXIT
 
-# ----------------------------------------------------------------------------
-# Create directory structure
-# ----------------------------------------------------------------------------
-mkdir -p "$CONTROL"
-mkdir -p "$DATA"
-
-# ----------------------------------------------------------------------------
-# Copy all project files preserving relative paths
-# ----------------------------------------------------------------------------
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-
-# List of files/directories to copy (relative to project root)
-COPY_LIST="
+FILES="
 etc/init.d/wanmon
 etc/wanmon/config.json
 usr/bin/wm-apply.sh
@@ -59,133 +78,64 @@ www/wanmon.html
 www/cgi-bin/wanmon.cgi
 "
 
-for item in $COPY_LIST; do
-    src="$PROJECT_ROOT/$item"
-    if [ ! -e "$src" ]; then
-        echo "WARNING: $src not found, skipping"
-        continue
-    fi
-    dst="$DATA/$item"
-    mkdir -p "$(dirname "$dst")"
-    cp -a "$src" "$dst"
-    echo "  Copied $item"
+for f in $FILES; do
+    copy "$f"
 done
 
 # ----------------------------------------------------------------------------
-# Create control file
+# CONTROL file
 # ----------------------------------------------------------------------------
-cat > "$CONTROL/control" <<EOF
+mkdir -p "$PKG_ROOT/CONTROL"
+
+echo "Writing control files..."
+
+cat > "$PKG_ROOT/CONTROL/control" <<EOF
 Package: $PKG_NAME
 Version: $PKG_VERSION-$PKG_REVISION
-Depends: $DEPENDS
+Depends: $PKG_DEPENDS
 Architecture: $PKG_ARCH
-Maintainer: $PKG_MAINTAINER
-Description: $PKG_DESCRIPTION
- This package provides automated WAN failover and monitoring.
- It measures latency, loss, jitter and switches default route.
+Maintainer: Pavel Bashkardin
+Description: WAN Monitor & Failover Controller
 EOF
 
 # ----------------------------------------------------------------------------
-# Create postinst script (runs after installation)
+# postinst
 # ----------------------------------------------------------------------------
-cat > "$CONTROL/postinst" <<'EOF'
+cat > "$PKG_ROOT/CONTROL/postinst" <<'EOF'
 #!/bin/sh
-# postinst for wanmon
-
-# Enable and start service
-if [ -x /etc/init.d/wanmon ]; then
-    /etc/init.d/wanmon enable
-    /etc/init.d/wanmon start
-fi
-
-# Ensure config exists (if not already)
-if [ ! -f /etc/wanmon/config.json ]; then
-    mkdir -p /etc/wanmon
-    cat > /etc/wanmon/config.json <<JSON
-{
-  "interval": 60,
-  "ping_host": "1.1.1.1",
-  "ping_timeout": 2,
-  "ping_samples": 5,
-  "smooth_window": 5,
-  "hysteresis_threshold": 20,
-  "loss_divisor": 10,
-  "hard_loss_limit": 80,
-  "dead_score": 99999,
-  "default_metric": 100,
-  "backup_metric": 20
-}
-JSON
-fi
-
+/etc/init.d/wanmon enable 2>/dev/null
+/etc/init.d/wanmon start 2>/dev/null
 exit 0
 EOF
 
-# ----------------------------------------------------------------------------
-# Create prerm script (runs before removal)
-# ----------------------------------------------------------------------------
-cat > "$CONTROL/prerm" <<'EOF'
+cat > "$PKG_ROOT/CONTROL/prerm" <<'EOF'
 #!/bin/sh
-# prerm for wanmon
-
-# Stop service if running
-if [ -x /etc/init.d/wanmon ]; then
-    /etc/init.d/wanmon stop
-    /etc/init.d/wanmon disable
-fi
-
-# Remove temporary runtime files (optional)
-# rm -rf /tmp/wanmon 2>/dev/null
-
+/etc/init.d/wanmon stop 2>/dev/null
+/etc/init.d/wanmon disable 2>/dev/null
 exit 0
 EOF
 
-# ----------------------------------------------------------------------------
-# Make scripts executable
-# ----------------------------------------------------------------------------
-chmod +x "$CONTROL/postinst" "$CONTROL/prerm"
+chmod +x "$PKG_ROOT/CONTROL/postinst"
+chmod +x "$PKG_ROOT/CONTROL/prerm"
 
 # ----------------------------------------------------------------------------
-# Build IPK using ipkg-build or manual ar
+# Build package
 # ----------------------------------------------------------------------------
-IPK_FILE="$PROJECT_ROOT/${PKG_NAME}_${PKG_VERSION}-${PKG_REVISION}_${PKG_ARCH}.ipk"
+echo "========== IPK BUILD =========="
+echo "PKG_ROOT    = $PKG_ROOT"
+echo "OUT         = $OUT"
+echo "IPKG_BUILD  = $IPKG_BUILD"
 
-# Prepare temp dirs for tar archives
-TMP_DATA="$BUILD_DIR/data"
-TMP_CONTROL="$BUILD_DIR/control"
-mkdir -p "$TMP_DATA" "$TMP_CONTROL"
+ls -l "$PKG_ROOT"
 
-# Copy data files (excluding CONTROL)
-cd "$DATA"
-find . -path ./CONTROL -prune -o -type f -print | while read -r file; do
-    mkdir -p "$TMP_DATA/$(dirname "$file")"
-    cp "$file" "$TMP_DATA/$file"
-done
-cd "$PROJECT_ROOT"
+if [ ! -x "$IPKG_BUILD" ]; then
+    echo "ERROR: ipk-build not executable: $IPKG_BUILD"
+    exit 1
+fi
 
-# Copy control files
-cp -r "$CONTROL/"* "$TMP_CONTROL/"
+echo "Running builder..."
 
-# Create compressed archives (no compression for speed, but use gzip)
-cd "$TMP_DATA"
-tar -czf "$BUILD_DIR/data.tar.gz" .
-cd "$TMP_CONTROL"
-tar -czf "$BUILD_DIR/control.tar.gz" .
+"$IPKG_BUILD" "$PKG_ROOT" "$OUT"
 
-# Create debian-binary
-echo "2.0" > "$BUILD_DIR/debian-binary"
-
-# Assemble with ar
-cd "$BUILD_DIR"
-ar r "$IPK_FILE" debian-binary control.tar.gz data.tar.gz 2>/dev/null
-
-echo ""
-echo "============================================================"
-echo "IPK package built successfully:"
-echo "  $IPK_FILE"
-echo ""
-echo "You can install it with:"
-echo "  opkg install $IPK_FILE"
-echo "============================================================"
-
-# Cleanup is done by trap
+echo "BUILD DONE"
+echo "OUTPUT DIR: $OUT"
