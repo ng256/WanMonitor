@@ -47,7 +47,7 @@ The daemon will start automatically and enable itself on boot.
 Clone this repository and run the build script:
 
 ```
-git clone https://github.com/ng256/wanmon.git
+git clone https://github.com/ng256/wanmonitor.git
 cd wanmon
 chmod +x wm-ipk-build.sh
 ./wwm-ipk-build.sh
