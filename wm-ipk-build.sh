@@ -2,7 +2,7 @@
 set -e
 
 # ============================================================================
-#   wm-build_ipk.sh – build IPK package for wanmon (OpenWrt official way)
+#   wm-build_ipk.sh - build IPK package for wanmon (OpenWrt official way)
 #   (C) 2026 Pavel Bashkardin
 # ============================================================================
 
