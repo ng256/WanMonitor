@@ -1,0 +1,19 @@
+cat > .gitignore <<'EOF'
+# Temporary build output
+out/
+*.ipk
+*.old
+*.tmp
+
+# Editor files
+*.swp
+*~
+.DS_Store
+
+# Logs and state (if any)
+/tmp/
+/wanmonitor/
+
+# Build tools (if you clone ipkg-build separately)
+tools/
+EOF
