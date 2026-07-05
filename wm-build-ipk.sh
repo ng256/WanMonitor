@@ -21,6 +21,10 @@ for arg in "$@"; do
         DEBUG=1
         break
     fi
+    if [ "$arg" = "--nodeps" ]; then
+        NO_DEPS=1
+        break
+    fi
 done
 
 # ----------------------------------------------------------------------------
@@ -29,6 +33,64 @@ done
 debug() {
     if [ "$DEBUG" -eq 1 ]; then
         echo "$@"
+    fi
+}
+
+# ----------------------------------------------------------------------------
+# Check and install build dependencies (coreutils-stat, tar)
+# ----------------------------------------------------------------------------
+check_deps() {
+    if [ "$NO_DEPS" -eq 1 ]; then
+        debug "Skipping dependency check (--no-deps)"
+        return
+    fi
+
+    need_install=""
+    need_reason=""
+
+    # Check stat
+    if ! command -v stat >/dev/null 2>&1; then
+        need_install="$need_install coreutils-stat"
+        need_reason="${need_reason}
+  - stat (required by ipk-build.sh)"
+    elif stat --version 2>&1 | grep -i busybox; then
+        need_install="$need_install coreutils-stat"
+        need_reason="${need_reason}
+  - stat (BusyBox version detected, full version required)"
+    fi
+
+    # Check tar (GNU version)
+    if ! command -v tar >/dev/null 2>&1; then
+        need_install="$need_install tar"
+        need_reason="${need_reason}
+  - tar (required by ipk-build.sh)"
+    elif tar --version 2>&1 | grep -i busybox; then
+        need_install="$need_install tar"
+        need_reason="${need_reason}
+  - tar (BusyBox version detected, GNU tar required)"
+    fi
+
+    if [ -z "$need_install" ]; then
+        debug "All build dependencies satisfied."
+        return
+    fi
+
+    echo "Missing build dependencies:"
+    echo "$need_reason"
+
+    if command -v opkg >/dev/null 2>&1; then
+        echo "Installing missing packages via opkg: $need_install"
+		debug "need_install = $need_install"
+        opkg update || echo "WARNING: opkg update failed, continuing anyway"
+        if ! opkg install $need_install; then
+            echo "ERROR: Failed to install packages. Please install manually: $need_install"
+            exit 1
+        fi
+        echo "Packages installed successfully."
+    else
+        echo "ERROR: opkg not found. Please install the following packages manually:"
+        echo "  $need_install"
+        exit 1
     fi
 }
 
@@ -51,6 +113,11 @@ debug "OUT          = $OUT"
 debug "PKG_ROOT     = $PKG_ROOT"
 debug "IPKG_BUILD   = $IPKG_BUILD"
 debug "========================================="
+
+# ----------------------------------------------------------------------------
+# Run dependency check
+# ----------------------------------------------------------------------------
+check_deps
 
 # ----------------------------------------------------------------------------
 # Prepare dirs
