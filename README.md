@@ -49,8 +49,8 @@ Clone this repository and run the build script:
 ```
 git clone https://github.com/ng256/wanmon.git
 cd wanmon
-chmod +x wm-build-ipk.sh
-./wm-build-ipk.sh
+chmod +x wm-ipk-build.sh
+./wwm-ipk-build.sh
 ```
 
 This creates `wanmon_1.0-1_all.ipk` in the `./out` directory. Install it with `opkg install`.
