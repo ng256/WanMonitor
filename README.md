@@ -32,7 +32,7 @@
 
 ### Option 1: Install the pre‑built IPK package (recommended)
 
-1. Download the `.ipk` file from the [Releases](https://github.com/yourusername/wanmon/releases) page.
+1. Download the `.ipk` file from the [Releases](https://github.com/ng256/wanmon/releases) page.
 2. Copy it to your router (e.g., via `scp`).
 3. Install it:
 
@@ -47,13 +47,13 @@ The daemon will start automatically and enable itself on boot.
 Clone this repository and run the build script:
 
 ```
-git clone https://github.com/yourusername/wanmon.git
+git clone https://github.com/ng256/wanmon.git
 cd wanmon
-chmod +x build-ipk.sh
-./build-ipk.sh
+chmod +x wm-build-ipk.sh
+./wm-build-ipk.sh
 ```
 
-This creates `wanmon_1.0-1_all.ipk` in the current directory. Install it with `opkg install`.
+This creates `wanmon_1.0-1_all.ipk` in the `./out` directory. Install it with `opkg install`.
 
 ### Option 3: Manual installation (without opkg)
 
