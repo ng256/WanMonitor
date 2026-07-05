@@ -12,25 +12,45 @@ PKG_REVISION="1"
 PKG_ARCH="all"
 PKG_DEPENDS="jq"
 
+# ----------------------------------------------------------------------------
+# Parse arguments
+# ----------------------------------------------------------------------------
+DEBUG=0
+for arg in "$@"; do
+    if [ "$arg" = "--debug" ]; then
+        DEBUG=1
+        break
+    fi
+done
+
+# ----------------------------------------------------------------------------
+# Debug logging helper
+# ----------------------------------------------------------------------------
+debug() {
+    if [ "$DEBUG" -eq 1 ]; then
+        echo "$@"
+    fi
+}
+
+# ----------------------------------------------------------------------------
+# Paths
+# ----------------------------------------------------------------------------
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/out"
 PKG_ROOT="$OUT/$PKG_NAME"
 IPKG_BUILD="$ROOT/tools/ipk-build.sh"
 
-# ----------------------------------------------------------------------------
-# DEBUG: variables dump
-# ----------------------------------------------------------------------------
-echo "================= DEBUG ================="
-echo "PKG_NAME     = $PKG_NAME"
-echo "PKG_VERSION  = $PKG_VERSION"
-echo "PKG_REVISION = $PKG_REVISION"
-echo "PKG_ARCH     = $PKG_ARCH"
-echo "PKG_DEPENDS  = $PKG_DEPENDS"
-echo "ROOT         = $ROOT"
-echo "OUT          = $OUT"
-echo "PKG_ROOT     = $PKG_ROOT"
-echo "IPKG_BUILD   = $IPKG_BUILD"
-echo "========================================="
+debug "================= DEBUG ================="
+debug "PKG_NAME     = $PKG_NAME"
+debug "PKG_VERSION  = $PKG_VERSION"
+debug "PKG_REVISION = $PKG_REVISION"
+debug "PKG_ARCH     = $PKG_ARCH"
+debug "PKG_DEPENDS  = $PKG_DEPENDS"
+debug "ROOT         = $ROOT"
+debug "OUT          = $OUT"
+debug "PKG_ROOT     = $PKG_ROOT"
+debug "IPKG_BUILD   = $IPKG_BUILD"
+debug "========================================="
 
 # ----------------------------------------------------------------------------
 # Prepare dirs
@@ -47,16 +67,16 @@ copy() {
     src="$ROOT/$1"
     dst="$PKG_ROOT/$1"
 
-    echo "COPY DEBUG:"
-    echo "  src = $src"
-    echo "  dst = $dst"
+    debug "COPY DEBUG:"
+    debug "  src = $src"
+    debug "  dst = $dst"
 
     if [ -e "$src" ]; then
         mkdir -p "$(dirname "$dst")"
         cp -a "$src" "$dst"
-        echo "  Copied $1"
+        debug "  Copied $1"
     else
-        echo "  Missing $1"
+        debug "  Missing $1"
     fi
 }
 
@@ -78,6 +98,7 @@ www/wanmon.html
 www/cgi-bin/wanmon.cgi
 "
 
+echo "Copying wanmon files..."
 for f in $FILES; do
     copy "$f"
 done
@@ -88,7 +109,8 @@ done
 mkdir -p "$PKG_ROOT/CONTROL"
 
 echo "Writing control files..."
-
+debug "CONTROL DEBUG:"
+debug "  control = $PKG_ROOT/CONTROL/control"
 cat > "$PKG_ROOT/CONTROL/control" <<EOF
 Package: $PKG_NAME
 Version: $PKG_VERSION-$PKG_REVISION
@@ -101,6 +123,7 @@ EOF
 # ----------------------------------------------------------------------------
 # postinst
 # ----------------------------------------------------------------------------
+debug "  postinst = $PKG_ROOT/CONTROL/postinst"
 cat > "$PKG_ROOT/CONTROL/postinst" <<'EOF'
 #!/bin/sh
 /etc/init.d/wanmon enable 2>/dev/null
@@ -108,6 +131,7 @@ cat > "$PKG_ROOT/CONTROL/postinst" <<'EOF'
 exit 0
 EOF
 
+debug "  prerm = $PKG_ROOT/CONTROL/prerm"
 cat > "$PKG_ROOT/CONTROL/prerm" <<'EOF'
 #!/bin/sh
 /etc/init.d/wanmon stop 2>/dev/null
@@ -121,12 +145,14 @@ chmod +x "$PKG_ROOT/CONTROL/prerm"
 # ----------------------------------------------------------------------------
 # Build package
 # ----------------------------------------------------------------------------
-echo "========== IPK BUILD =========="
-echo "PKG_ROOT    = $PKG_ROOT"
-echo "OUT         = $OUT"
-echo "IPKG_BUILD  = $IPKG_BUILD"
+debug "========== IPK BUILD =========="
+debug "PKG_ROOT    = $PKG_ROOT"
+debug "OUT         = $OUT"
+debug "IPKG_BUILD  = $IPKG_BUILD"
 
-ls -l "$PKG_ROOT"
+if [ "$DEBUG" -eq 1 ]; then
+    ls -l "$PKG_ROOT"
+fi
 
 if [ ! -x "$IPKG_BUILD" ]; then
     echo "ERROR: ipk-build not executable: $IPKG_BUILD"
@@ -137,5 +163,5 @@ echo "Running builder..."
 
 "$IPKG_BUILD" "$PKG_ROOT" "$OUT"
 
-echo "BUILD DONE"
-echo "OUTPUT DIR: $OUT"
+debug "BUILD DONE"
+debug "OUTPUT DIR: $OUT"
